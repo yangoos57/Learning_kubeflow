@@ -1,0 +1,4 @@
+artifact_location: file:///Users/yangwoolee/git_repo/Learning_kubeflow/example/%E1%84%86%E1%85%A9%E1%84%83%E1%85%AE%E1%84%8B%E1%85%B4%20MLOps/mlruns/0
+experiment_id: '0'
+lifecycle_stage: active
+name: Default

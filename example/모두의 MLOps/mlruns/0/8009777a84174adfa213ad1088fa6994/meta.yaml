@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/yangwoolee/git_repo/Learning_kubeflow/example/%E1%84%86%E1%85%A9%E1%84%83%E1%85%AE%E1%84%8B%E1%85%B4%20MLOps/mlruns/0/8009777a84174adfa213ad1088fa6994/artifacts
+end_time: 1673428226697
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+name: ''
+run_id: 8009777a84174adfa213ad1088fa6994
+run_uuid: 8009777a84174adfa213ad1088fa6994
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1673428226685
+status: 3
+tags: []
+user_id: yangwoolee
