@@ -128,3 +128,7 @@ dmypy.json
 # Pyre type checker
 .pyre/
 /comment
+/basePython
+mini_project/model_store
+mini_project/logs
+mini_project/bert_model

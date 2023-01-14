@@ -1,0 +1,198 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: nlp-pipeline-
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.18, pipelines.kubeflow.org/pipeline_compilation_time: '2023-01-13T19:29:09.615748',
+    pipelines.kubeflow.org/pipeline_spec: '{"name": "NLP_Pipeline"}'}
+  labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.18}
+spec:
+  entrypoint: nlp-pipeline
+  templates:
+  - name: load-data
+    container:
+      args: [--train, /tmp/outputs/train/data, --evaluation, /tmp/outputs/evaluation/data]
+      command:
+      - sh
+      - -c
+      - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+        'pandas' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet
+        --no-warn-script-location 'pandas' --user) && "$0" "$@"
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def _make_parent_dirs_and_return_path(file_path: str):
+            import os
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            return file_path
+
+        def load_data(
+            train_path,
+            evaluation_path,
+        ):
+
+            import pandas as pd
+
+            # load data from github
+            df_train = pd.read_csv(
+                "https://raw.github.com/yangoos57/Learning_kubeflow/main/mini_project/data/train.csv"
+            )
+            df_evaluation = pd.read_csv(
+                "https://raw.github.com/yangoos57/Learning_kubeflow/main/mini_project/data/validation.csv"
+            )
+
+            df_train.to_csv(train_path, index=False)
+            df_evaluation.to_csv(evaluation_path, index=False)
+
+            print('complete Loading Data')
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Load data', description='')
+        _parser.add_argument("--train", dest="train_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--evaluation", dest="evaluation_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+        _parsed_args = vars(_parser.parse_args())
+
+        _outputs = load_data(**_parsed_args)
+      image: python:3.7
+    outputs:
+      artifacts:
+      - {name: load-data-evaluation, path: /tmp/outputs/evaluation/data}
+      - {name: load-data-train, path: /tmp/outputs/train/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.18
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["--train", {"outputPath": "train"}, "--evaluation", {"outputPath":
+          "evaluation"}], "command": ["sh", "-c", "(PIP_DISABLE_PIP_VERSION_CHECK=1
+          python3 -m pip install --quiet --no-warn-script-location ''pandas'' || PIP_DISABLE_PIP_VERSION_CHECK=1
+          python3 -m pip install --quiet --no-warn-script-location ''pandas'' --user)
+          && \"$0\" \"$@\"", "sh", "-ec", "program_path=$(mktemp)\nprintf \"%s\" \"$0\"
+          > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n", "def _make_parent_dirs_and_return_path(file_path:
+          str):\n    import os\n    os.makedirs(os.path.dirname(file_path), exist_ok=True)\n    return
+          file_path\n\ndef load_data(\n    train_path,\n    evaluation_path,\n):\n\n    import
+          pandas as pd\n\n    # load data from github\n    df_train = pd.read_csv(\n        \"https://raw.github.com/yangoos57/Learning_kubeflow/main/mini_project/data/train.csv\"\n    )\n    df_evaluation
+          = pd.read_csv(\n        \"https://raw.github.com/yangoos57/Learning_kubeflow/main/mini_project/data/validation.csv\"\n    )\n\n    df_train.to_csv(train_path,
+          index=False)\n    df_evaluation.to_csv(evaluation_path, index=False)\n\n    print(''complete
+          Loading Data'')\n\nimport argparse\n_parser = argparse.ArgumentParser(prog=''Load
+          data'', description='''')\n_parser.add_argument(\"--train\", dest=\"train_path\",
+          type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--evaluation\",
+          dest=\"evaluation_path\", type=_make_parent_dirs_and_return_path, required=True,
+          default=argparse.SUPPRESS)\n_parsed_args = vars(_parser.parse_args())\n\n_outputs
+          = load_data(**_parsed_args)\n"], "image": "python:3.7"}}, "name": "Load
+          data", "outputs": [{"name": "train", "type": "csv"}, {"name": "evaluation",
+          "type": "csv"}]}', pipelines.kubeflow.org/component_ref: '{}'}
+  - name: nlp-pipeline
+    dag:
+      tasks:
+      - {name: load-data, template: load-data}
+      - name: train-model
+        template: train-model
+        dependencies: [load-data]
+        arguments:
+          artifacts:
+          - {name: load-data-evaluation, from: '{{tasks.load-data.outputs.artifacts.load-data-evaluation}}'}
+          - {name: load-data-train, from: '{{tasks.load-data.outputs.artifacts.load-data-train}}'}
+  - name: train-model
+    container:
+      args: [--train, /tmp/inputs/train/data, --evaluation, /tmp/inputs/evaluation/data]
+      command:
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def train_model(
+            train_path,
+            evaluation_path,
+        ):
+
+            from transformers import (
+                DistilBertForSequenceClassification,
+                DistilBertTokenizer,
+                Trainer,
+                TrainingArguments,
+            )
+            from datasets import Dataset
+
+            # loading data
+            train_dataset = Dataset.from_csv(train_path)
+            evaluation_dataset = Dataset.from_csv(evaluation_path)
+
+            # tokenizing
+            tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
+
+            def tokenize_function(item):
+                return tokenizer(item["text"], padding="max_length", max_length=128, truncation=True)
+
+            train = train_dataset.map(tokenize_function)
+            evaluation = evaluation_dataset.map(tokenize_function)
+
+            print('complete Tokenizing')
+
+            model = DistilBertForSequenceClassification.from_pretrained(
+                "distilbert-base-uncased", num_labels=len(set(train_dataset["label"]))
+            )
+            tra_arg = TrainingArguments(
+                num_train_epochs=1,
+                output_dir="test",
+                evaluation_strategy="epoch",
+            )
+
+            trainer = Trainer(
+                model=model,
+                args=tra_arg,
+                train_dataset=train,
+                eval_dataset=evaluation,
+            )
+
+            trainer.train()
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Train model', description='')
+        _parser.add_argument("--train", dest="train_path", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--evaluation", dest="evaluation_path", type=str, required=True, default=argparse.SUPPRESS)
+        _parsed_args = vars(_parser.parse_args())
+
+        _outputs = train_model(**_parsed_args)
+      image: 679oose/basepython:1.0
+    inputs:
+      artifacts:
+      - {name: load-data-evaluation, path: /tmp/inputs/evaluation/data}
+      - {name: load-data-train, path: /tmp/inputs/train/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.18
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["--train", {"inputPath": "train"}, "--evaluation", {"inputPath":
+          "evaluation"}], "command": ["sh", "-ec", "program_path=$(mktemp)\nprintf
+          \"%s\" \"$0\" > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n",
+          "def train_model(\n    train_path,\n    evaluation_path,\n):\n\n    from
+          transformers import (\n        DistilBertForSequenceClassification,\n        DistilBertTokenizer,\n        Trainer,\n        TrainingArguments,\n    )\n    from
+          datasets import Dataset\n\n    # loading data\n    train_dataset = Dataset.from_csv(train_path)\n    evaluation_dataset
+          = Dataset.from_csv(evaluation_path)\n\n    # tokenizing\n    tokenizer =
+          DistilBertTokenizer.from_pretrained(\"distilbert-base-uncased\")\n\n    def
+          tokenize_function(item):\n        return tokenizer(item[\"text\"], padding=\"max_length\",
+          max_length=128, truncation=True)\n\n    train = train_dataset.map(tokenize_function)\n    evaluation
+          = evaluation_dataset.map(tokenize_function)\n\n    print(''complete Tokenizing'')\n\n    model
+          = DistilBertForSequenceClassification.from_pretrained(\n        \"distilbert-base-uncased\",
+          num_labels=len(set(train_dataset[\"label\"]))\n    )\n    tra_arg = TrainingArguments(\n        num_train_epochs=1,\n        output_dir=\"test\",\n        evaluation_strategy=\"epoch\",\n    )\n\n    trainer
+          = Trainer(\n        model=model,\n        args=tra_arg,\n        train_dataset=train,\n        eval_dataset=evaluation,\n    )\n\n    trainer.train()\n\nimport
+          argparse\n_parser = argparse.ArgumentParser(prog=''Train model'', description='''')\n_parser.add_argument(\"--train\",
+          dest=\"train_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--evaluation\",
+          dest=\"evaluation_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parsed_args
+          = vars(_parser.parse_args())\n\n_outputs = train_model(**_parsed_args)\n"],
+          "image": "679oose/basepython:1.0"}}, "inputs": [{"name": "train", "type":
+          "csv"}, {"name": "evaluation", "type": "csv"}], "name": "Train model"}',
+        pipelines.kubeflow.org/component_ref: '{}'}
+  arguments:
+    parameters: []
+  serviceAccountName: pipeline-runner
