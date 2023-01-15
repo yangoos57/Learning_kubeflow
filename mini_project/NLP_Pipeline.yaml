@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: nlp-pipeline-
-  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.18, pipelines.kubeflow.org/pipeline_compilation_time: '2023-01-13T19:29:09.615748',
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.18, pipelines.kubeflow.org/pipeline_compilation_time: '2023-01-13T22:36:39.157610',
     pipelines.kubeflow.org/pipeline_spec: '{"name": "NLP_Pipeline"}'}
   labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.18}
 spec:
@@ -99,7 +99,8 @@ spec:
           - {name: load-data-train, from: '{{tasks.load-data.outputs.artifacts.load-data-train}}'}
   - name: train-model
     container:
-      args: [--train, /tmp/inputs/train/data, --evaluation, /tmp/inputs/evaluation/data]
+      args: [--train, /tmp/inputs/train/data, --evaluation, /tmp/inputs/evaluation/data,
+        --model-save, /tmp/outputs/model_save/data]
       command:
       - sh
       - -ec
@@ -108,9 +109,15 @@ spec:
         printf "%s" "$0" > "$program_path"
         python3 -u "$program_path" "$@"
       - |
+        def _make_parent_dirs_and_return_path(file_path: str):
+            import os
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            return file_path
+
         def train_model(
             train_path,
             evaluation_path,
+            model_save_path,
         ):
 
             from transformers import (
@@ -118,6 +125,7 @@ spec:
                 DistilBertTokenizer,
                 Trainer,
                 TrainingArguments,
+                TrainerCallback
             )
             from datasets import Dataset
 
@@ -140,24 +148,35 @@ spec:
                 "distilbert-base-uncased", num_labels=len(set(train_dataset["label"]))
             )
             tra_arg = TrainingArguments(
-                num_train_epochs=1,
                 output_dir="test",
+                num_train_epochs=1,
+                logging_steps=5,
                 evaluation_strategy="epoch",
+                disable_tqdm=True,
+                save_strategy = "no"
             )
+
+            class myCallback(TrainerCallback):
+
+                def on_log(self, args, state, control, logs=None, **kwargs):
+                    print(f'{state.global_step} Steps ')
 
             trainer = Trainer(
                 model=model,
                 args=tra_arg,
                 train_dataset=train,
                 eval_dataset=evaluation,
+                callbacks=[myCallback]
             )
 
             trainer.train()
+            trainer.save_model(model_save_path)
 
         import argparse
         _parser = argparse.ArgumentParser(prog='Train model', description='')
         _parser.add_argument("--train", dest="train_path", type=str, required=True, default=argparse.SUPPRESS)
         _parser.add_argument("--evaluation", dest="evaluation_path", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--model-save", dest="model_save_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
         _parsed_args = vars(_parser.parse_args())
 
         _outputs = train_model(**_parsed_args)
@@ -166,6 +185,9 @@ spec:
       artifacts:
       - {name: load-data-evaluation, path: /tmp/inputs/evaluation/data}
       - {name: load-data-train, path: /tmp/inputs/train/data}
+    outputs:
+      artifacts:
+      - {name: train-model-model_save, path: /tmp/outputs/model_save/data}
     metadata:
       labels:
         pipelines.kubeflow.org/kfp_sdk_version: 1.8.18
@@ -173,10 +195,12 @@ spec:
         pipelines.kubeflow.org/enable_caching: "true"
       annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
           {"args": ["--train", {"inputPath": "train"}, "--evaluation", {"inputPath":
-          "evaluation"}], "command": ["sh", "-ec", "program_path=$(mktemp)\nprintf
-          \"%s\" \"$0\" > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n",
-          "def train_model(\n    train_path,\n    evaluation_path,\n):\n\n    from
-          transformers import (\n        DistilBertForSequenceClassification,\n        DistilBertTokenizer,\n        Trainer,\n        TrainingArguments,\n    )\n    from
+          "evaluation"}, "--model-save", {"outputPath": "model_save"}], "command":
+          ["sh", "-ec", "program_path=$(mktemp)\nprintf \"%s\" \"$0\" > \"$program_path\"\npython3
+          -u \"$program_path\" \"$@\"\n", "def _make_parent_dirs_and_return_path(file_path:
+          str):\n    import os\n    os.makedirs(os.path.dirname(file_path), exist_ok=True)\n    return
+          file_path\n\ndef train_model(\n    train_path,\n    evaluation_path,\n    model_save_path,\n):\n\n    from
+          transformers import (\n        DistilBertForSequenceClassification,\n        DistilBertTokenizer,\n        Trainer,\n        TrainingArguments,\n        TrainerCallback\n    )\n    from
           datasets import Dataset\n\n    # loading data\n    train_dataset = Dataset.from_csv(train_path)\n    evaluation_dataset
           = Dataset.from_csv(evaluation_path)\n\n    # tokenizing\n    tokenizer =
           DistilBertTokenizer.from_pretrained(\"distilbert-base-uncased\")\n\n    def
@@ -184,15 +208,19 @@ spec:
           max_length=128, truncation=True)\n\n    train = train_dataset.map(tokenize_function)\n    evaluation
           = evaluation_dataset.map(tokenize_function)\n\n    print(''complete Tokenizing'')\n\n    model
           = DistilBertForSequenceClassification.from_pretrained(\n        \"distilbert-base-uncased\",
-          num_labels=len(set(train_dataset[\"label\"]))\n    )\n    tra_arg = TrainingArguments(\n        num_train_epochs=1,\n        output_dir=\"test\",\n        evaluation_strategy=\"epoch\",\n    )\n\n    trainer
-          = Trainer(\n        model=model,\n        args=tra_arg,\n        train_dataset=train,\n        eval_dataset=evaluation,\n    )\n\n    trainer.train()\n\nimport
+          num_labels=len(set(train_dataset[\"label\"]))\n    )\n    tra_arg = TrainingArguments(\n        output_dir=\"test\",\n        num_train_epochs=1,\n        logging_steps=5,\n        evaluation_strategy=\"epoch\",\n        disable_tqdm=True,\n        save_strategy
+          = \"no\"\n    )\n\n    class myCallback(TrainerCallback):\n\n        def
+          on_log(self, args, state, control, logs=None, **kwargs):\n            print(f''{state.global_step}
+          Steps '')\n\n    trainer = Trainer(\n        model=model,\n        args=tra_arg,\n        train_dataset=train,\n        eval_dataset=evaluation,\n        callbacks=[myCallback]\n    )\n\n    trainer.train()\n    trainer.save_model(model_save_path)\n\nimport
           argparse\n_parser = argparse.ArgumentParser(prog=''Train model'', description='''')\n_parser.add_argument(\"--train\",
           dest=\"train_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--evaluation\",
-          dest=\"evaluation_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parsed_args
-          = vars(_parser.parse_args())\n\n_outputs = train_model(**_parsed_args)\n"],
-          "image": "679oose/basepython:1.0"}}, "inputs": [{"name": "train", "type":
-          "csv"}, {"name": "evaluation", "type": "csv"}], "name": "Train model"}',
-        pipelines.kubeflow.org/component_ref: '{}'}
+          dest=\"evaluation_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--model-save\",
+          dest=\"model_save_path\", type=_make_parent_dirs_and_return_path, required=True,
+          default=argparse.SUPPRESS)\n_parsed_args = vars(_parser.parse_args())\n\n_outputs
+          = train_model(**_parsed_args)\n"], "image": "679oose/basepython:1.0"}},
+          "inputs": [{"name": "train", "type": "csv"}, {"name": "evaluation", "type":
+          "csv"}], "name": "Train model", "outputs": [{"name": "model_save", "type":
+          "folder"}]}', pipelines.kubeflow.org/component_ref: '{}'}
   arguments:
     parameters: []
   serviceAccountName: pipeline-runner
