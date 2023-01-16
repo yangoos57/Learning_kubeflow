@@ -89,7 +89,7 @@ with open("a11sd.properties", "w") as f:
             "models": {
                 "mnist": {
                     "1.0": {
-                        "defaultVersion": true,
+                        "defaultVersion": "true",
                         "marName": "mnist.mar",
                         "minWorkers": 1,
                         "maxWorkers": 5,
