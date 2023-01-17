@@ -1,0 +1,56 @@
+### Deployment와 Service 포함
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongo-deployment
+  labels:
+    app: mongo
+spec:
+  # Pods를 몇개 실행할지
+  replicas: 1
+  # Deployment 단계에서 구분하기 위한 Labels 설정
+  selector:
+    matchLabels:
+      app: mongo
+  # configuration for Pod
+  template:
+    metadata:
+      # 동일한 Pod가 여러 개 생길 때 하나의 범주로 묶기 위해 Labels 설정
+      labels:
+        app: mongo
+    spec:
+      # 어떤 이미지를 불러올 것인지
+      containers:
+        - name: mongodb
+          image: mongo:5.0
+          ports:
+            # MongoDB Port가 27017임.
+            - containerPort: 27017
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: mongo-user
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: mongo-password
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  # mongo-config의 name과 동일하게
+  name: mongo-service
+spec:
+  selector:
+    app.kubernetes.io/name: mongo
+  ports:
+    - protocol: TCP
+      # port는 굳이 갖지 않아도 되는데 관습상 containerPort와 맞춤
+      port: 27017
+      # container Port와 같아야함.
+      targetPort: 27017
