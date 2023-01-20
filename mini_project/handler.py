@@ -51,14 +51,15 @@ class TransformersClassifierHandler(BaseHandler, ABC):
         """Very basic preprocessing code - only tokenizes.
         Extend with your own preprocessing steps as needed.
         """
+        print("------- input data 확인 --------")
+        print(data)
         text = data[0].get("data")
         if text is None:
             text = data[0].get("body")
-        print("*************** input_text *************")
-        print(text)
+
+        logger.info("Received text: '%s'", text)
 
         inputs = self.tokenizer.encode_plus(text, add_special_tokens=True, return_tensors="pt")
-        print(input)
         return inputs
 
     def inference(self, inputs):
@@ -76,18 +77,13 @@ class TransformersClassifierHandler(BaseHandler, ABC):
 
         if self.mapping:
             prediction = self.mapping[str(prediction)]
-        print("*************** prediction *************")
-        print(prediction)
         return [prediction]
 
     def postprocess(self, inference_output):
         # TODO: Add any needed post-processing of the model predictions here
         logger.info("Model Name: '%s'", self.model.config._name_or_path)
         logger.info("Model predicted: '%s'", inference_output)
-        result = json.dumps({"output": inference_output[0]})
-        print("*************** inference_output *************")
-        print(result)
-        return [result]
+        return inference_output
 
 
 _service = TransformersClassifierHandler()

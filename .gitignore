@@ -131,5 +131,5 @@ dmypy.json
 /basePython
 mini_project/model_store
 mini_project/logs
-mini_project/bert_model
+mini_project/torch_model
 bert-model.mar
