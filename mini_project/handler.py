@@ -5,7 +5,6 @@ import os
 
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
-
 from ts.torch_handler.base_handler import BaseHandler
 
 logger = logging.getLogger(__name__)
@@ -30,9 +29,10 @@ class TransformersClassifierHandler(BaseHandler, ABC):
         self.tokenizer = AutoTokenizer.from_pretrained(model_dir)
 
         self.model.to(self.device)
+        # BetterTransformer
         self.model.eval()
 
-        logger.debug("Transformer model from path {0} loaded successfully".format(model_dir))
+        logger.debug(f"Transformer model from path {model_dir} loaded successfully")
 
         # Read the mapping file, index to object name
         mapping_file_path = os.path.join(model_dir, "index_to_name.json")
@@ -51,13 +51,13 @@ class TransformersClassifierHandler(BaseHandler, ABC):
         """Very basic preprocessing code - only tokenizes.
         Extend with your own preprocessing steps as needed.
         """
-        print("------- input data 확인 --------")
+        print("------- input data --------")
         print(data)
         text = data[0].get("data")
         if text is None:
             text = data[0].get("body")
 
-        logger.info("Received text: '%s'", text)
+        logger.info(f"Received text: {text}")
 
         inputs = self.tokenizer.encode_plus(text, add_special_tokens=True, return_tensors="pt")
         return inputs
@@ -73,7 +73,7 @@ class TransformersClassifierHandler(BaseHandler, ABC):
         inputs = inputs.to(self.device)
 
         prediction = self.model(**inputs)[0].argmax().item()
-        logger.info("Model predicted: '%s'", prediction)
+        logger.info(f"Model predicted: {prediction}")
 
         if self.mapping:
             prediction = self.mapping[str(prediction)]
@@ -81,8 +81,8 @@ class TransformersClassifierHandler(BaseHandler, ABC):
 
     def postprocess(self, inference_output):
         # TODO: Add any needed post-processing of the model predictions here
-        logger.info("Model Name: '%s'", self.model.config._name_or_path)
-        logger.info("Model predicted: '%s'", inference_output)
+        logger.info(f"Model Name: {self.model.config._name_or_path}")
+        logger.info(f"Model predicted: {inference_output}")
         return inference_output
 
 

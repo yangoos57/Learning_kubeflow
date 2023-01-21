@@ -36,6 +36,8 @@ from transformers import DistilBertForSequenceClassification, DistilBertTokenize
 model = DistilBertForSequenceClassification.from_pretrained(
     "distilbert-base-uncased", num_labels=len(set(train_dataset["label"]))
 )
+
+
 tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
 
 print("good3")
@@ -69,37 +71,37 @@ trainer.train()
 print("good4")
 
 
-with open("a11sd.properties", "w") as f:
-    x = dict(
-        inference_address="http://0.0.0.0:8085",
-        management_address="http://0.0.0.0:8085",
-        metrics_address="http://0.0.0.0:8082",
-        grpc_inference_port=7070,
-        grpc_management_port=7071,
-        enable_metrics_api="true",
-        metrics_format="prometheus",
-        number_of_netty_threads=4,
-        job_queue_size=10,
-        enable_envvars_config="true",
-        install_py_dep_per_model="true",
-        model_store="/mnt/models/model-store",
-        model_snapshot={
-            "name": "startup.cfg",
-            "modelCount": 1,
-            "models": {
-                "mnist": {
-                    "1.0": {
-                        "defaultVersion": "true",
-                        "marName": "mnist.mar",
-                        "minWorkers": 1,
-                        "maxWorkers": 5,
-                        "batchSize": 1,
-                        "maxBatchDelay": 10,
-                        "responseTimeout": 120,
-                    }
-                }
-            },
-        },
-    )
-    f.write(x)
-    f.close()
+# with open("a11sd.properties", "w") as f:
+#     x = dict(
+#         inference_address="http://0.0.0.0:8085",
+#         management_address="http://0.0.0.0:8085",
+#         metrics_address="http://0.0.0.0:8082",
+#         grpc_inference_port=7070,
+#         grpc_management_port=7071,
+#         enable_metrics_api="true",
+#         metrics_format="prometheus",
+#         number_of_netty_threads=4,
+#         job_queue_size=10,
+#         enable_envvars_config="true",
+#         install_py_dep_per_model="true",
+#         model_store="/mnt/models/model-store",
+#         model_snapshot={
+#             "name": "startup.cfg",
+#             "modelCount": 1,
+#             "models": {
+#                 "mnist": {
+#                     "1.0": {
+#                         "defaultVersion": "true",
+#                         "marName": "mnist.mar",
+#                         "minWorkers": 1,
+#                         "maxWorkers": 5,
+#                         "batchSize": 1,
+#                         "maxBatchDelay": 10,
+#                         "responseTimeout": 120,
+#                     }
+#                 }
+#             },
+#         },
+#     )
+#     f.write(x)
+#     f.close()

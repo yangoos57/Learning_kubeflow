@@ -132,4 +132,6 @@ dmypy.json
 mini_project/model_store
 mini_project/logs
 mini_project/torch_model
-bert-model.mar
+generating_docker_img
+kubeflow-master
+manifests

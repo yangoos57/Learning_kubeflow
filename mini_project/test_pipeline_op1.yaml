@@ -1,0 +1,73 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: test-pipeline-
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.18, pipelines.kubeflow.org/pipeline_compilation_time: '2023-01-20T22:54:19.138319',
+    pipelines.kubeflow.org/pipeline_spec: '{"name": "test_pipeline"}'}
+  labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.18}
+spec:
+  entrypoint: test-pipeline
+  templates:
+  - name: load-data-create-component-from-func
+    container:
+      args: []
+      command:
+      - sh
+      - -c
+      - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+        'pandas' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet
+        --no-warn-script-location 'pandas' --user) && "$0" "$@"
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - "def load_data_create_component_from_func(\n    # train_path: OutputArtifact(\"\
+        pvc\"),\n    # evaluation_path: OutputArtifact(\"pvc\"),\n):\n\n    import\
+        \ pandas as pd\n    import os \n\n    print('listdir : \\n', os.listdir())\n\
+        \n    print(\"load_pandas\")\n\n    # load data from github\n    df_train\
+        \ = pd.read_csv(\n        \"https://raw.github.com/yangoos57/Learning_kubeflow/main/mini_project/data/train.csv\"\
+        \n    )\n    df_evaluation = pd.read_csv(\n        \"https://raw.github.com/yangoos57/Learning_kubeflow/main/mini_project/data/validation.csv\"\
+        \n    )\n    print(\"Complete_loading_data_to_pandas\")\n\n    df_train.to_csv('pvc/train_csv',\
+        \ index=False)\n    df_evaluation.to_csv('pvc/val.csv', index=False)\n\n \
+        \   # df_train.to_csv(train_path, index=False)\n    # df_evaluation.to_csv(evaluation_path,\
+        \ index=False)\n\n    print(\"complete Loading Data\")\n\nimport argparse\n\
+        _parser = argparse.ArgumentParser(prog='Load data create component from func',\
+        \ description='')\n_parsed_args = vars(_parser.parse_args())\n\n_outputs =\
+        \ load_data_create_component_from_func(**_parsed_args)\n"
+      image: python:3.9
+      volumeMounts:
+      - {mountPath: pvc, name: test-lee}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.18
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": [], "command": ["sh", "-c", "(PIP_DISABLE_PIP_VERSION_CHECK=1 python3
+          -m pip install --quiet --no-warn-script-location ''pandas'' || PIP_DISABLE_PIP_VERSION_CHECK=1
+          python3 -m pip install --quiet --no-warn-script-location ''pandas'' --user)
+          && \"$0\" \"$@\"", "sh", "-ec", "program_path=$(mktemp)\nprintf \"%s\" \"$0\"
+          > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n", "def load_data_create_component_from_func(\n    #
+          train_path: OutputArtifact(\"pvc\"),\n    # evaluation_path: OutputArtifact(\"pvc\"),\n):\n\n    import
+          pandas as pd\n    import os \n\n    print(''listdir : \\n'', os.listdir())\n\n    print(\"load_pandas\")\n\n    #
+          load data from github\n    df_train = pd.read_csv(\n        \"https://raw.github.com/yangoos57/Learning_kubeflow/main/mini_project/data/train.csv\"\n    )\n    df_evaluation
+          = pd.read_csv(\n        \"https://raw.github.com/yangoos57/Learning_kubeflow/main/mini_project/data/validation.csv\"\n    )\n    print(\"Complete_loading_data_to_pandas\")\n\n    df_train.to_csv(''pvc/train_csv'',
+          index=False)\n    df_evaluation.to_csv(''pvc/val.csv'', index=False)\n\n    #
+          df_train.to_csv(train_path, index=False)\n    # df_evaluation.to_csv(evaluation_path,
+          index=False)\n\n    print(\"complete Loading Data\")\n\nimport argparse\n_parser
+          = argparse.ArgumentParser(prog=''Load data create component from func'',
+          description='''')\n_parsed_args = vars(_parser.parse_args())\n\n_outputs
+          = load_data_create_component_from_func(**_parsed_args)\n"], "image": "python:3.9"}},
+          "name": "Load data create component from func"}', pipelines.kubeflow.org/component_ref: '{}'}
+    volumes:
+    - name: test-lee
+      persistentVolumeClaim: {claimName: lee}
+  - name: test-pipeline
+    dag:
+      tasks:
+      - {name: load-data-create-component-from-func, template: load-data-create-component-from-func}
+  arguments:
+    parameters: []
+  serviceAccountName: pipeline-runner
