@@ -1,9 +1,5 @@
-FROM python:3.8-slim
+FROM python:3.9-slim-bullseye
 
-COPY ./src /pipelines/component/src
+RUN pip3 install pip --upgrade
 
-WORKDIR /pipelines/component/src
-
-RUN pip3 install -r requirements.txt
-
-CMD ['cd' '/']
+RUN pip3 install transformers datasets torch
